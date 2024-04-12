@@ -1,12 +1,18 @@
 // ScanActivity.kt
 package com.example.androidsmartdevice
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,12 +30,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 
 class ScanActivity : ComponentActivity() {
+    private val requestMultiplePermissionsLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            permissions.entries.forEach {
+                val isGranted = it.value
+                if (isGranted) {
+                    // Permission was granted. You can perform your operation here.
+                } else {
+                    // Permission was denied. You can notify the user that the operation cannot be performed.
+                }
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val isBluetoothEnabled = checkBluetoothStatus(this)
+            val isBluetoothEnabled = checkBluetoothStatus(this, requestMultiplePermissionsLauncher)
             if (isBluetoothEnabled) {
                 // Initialiser la liste des appareils et les interactions avec le bouton si le Bluetooth est activé
                 ScanActivityContent()
@@ -37,33 +56,54 @@ class ScanActivity : ComponentActivity() {
             }
         }
     }
+
+
 }
 // Composable function to display the content of the Scan Activity
 
-    @Composable
-    fun ScanActivityContent() {
-        val isSquareIcon = remember { mutableStateOf(false) }
-        val isScanning = remember { mutableStateOf(false) }
-        ScanActivityUI(isSquareIcon, isScanning, ::toggleButtonPlayScan)
-    }
+@Composable
+fun ScanActivityContent() {
+    val isSquareIcon = remember { mutableStateOf(false) }
+    val isScanning = remember { mutableStateOf(false) }
+    ScanActivityUI(isSquareIcon, isScanning, ::toggleButtonPlayScan)
+}
 
 // Function to toggle the play/scan button
-    private fun toggleButtonPlayScan(
-        isSquareIcon: MutableState<Boolean>,
-        isScanning: MutableState<Boolean>
-    ) {
-        isSquareIcon.value = !isSquareIcon.value
-        isScanning.value = !isScanning.value
+private fun toggleButtonPlayScan(
+    isSquareIcon: MutableState<Boolean>,
+    isScanning: MutableState<Boolean>
+) {
+    isSquareIcon.value = !isSquareIcon.value
+    isScanning.value = !isScanning.value
+}
+
+
+
+// Function to check if all the permissions are granted
+fun areAllPermissionsGranted(context: Context): Boolean {
+    val permissions = arrayOf(
+        Manifest.permission.BLUETOOTH,
+        Manifest.permission.BLUETOOTH_ADMIN,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    )
+    return permissions.all {
+        ContextCompat.checkSelfPermission(
+            context,
+            it
+        ) == PackageManager.PERMISSION_GRANTED
     }
+}
 
-
-// Function to check the Bluetooth status et doit gere les cas ou le bluetooth est desactive ou non supporte
 @Composable
-fun checkBluetoothStatus(context: Context): Boolean {
+fun checkBluetoothStatus(
+    context: Context, requestMultiplePermissionsLauncher: ActivityResultLauncher<Array<String>>,
+): Boolean {
     val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     if (bluetoothAdapter == null) {
         // Device doesn't support Bluetooth
-        Toast.makeText(context, "Votre appareil ne supporte pas le Bluetooth", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Votre appareil ne supporte pas le Bluetooth", Toast.LENGTH_SHORT)
+            .show()
         BluetoothNotSupportedScreen()
         return false
     } else {
@@ -71,11 +111,35 @@ fun checkBluetoothStatus(context: Context): Boolean {
             // Bluetooth is not enabled
             Toast.makeText(context, "Bluetooth désactivé", Toast.LENGTH_SHORT).show()
             BluetoothDisabledScreen()
+            // Check if the permission is granted
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                // Permission is granted, open Bluetooth settings
+                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                context.startActivity(enableBtIntent)
+            } else {
+                // Permission is not granted, request the permission
+                requestMultiplePermissionsLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH))
+            }
             return false
         } else {
             // Bluetooth is enabled
             Toast.makeText(context, "Bluetooth activé", Toast.LENGTH_SHORT).show()
-            return true
+            // Check if all permissions are granted
+            val allPermissionsGranted = areAllPermissionsGranted(context)
+            if (!allPermissionsGranted) {
+                // Not all permissions are granted, request the permissions
+                requestMultiplePermissionsLauncher.launch(arrayOf(
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ))
+            }
+            return allPermissionsGranted
         }
     }
 }
@@ -124,6 +188,7 @@ fun ScanActivityUI(
         DisplayDevices(isScanning, devices) // Pass the devices list here
     }
 }
+
 @Composable
 fun BluetoothDisabledScreen() {
     Column(
@@ -152,6 +217,9 @@ fun BluetoothNotSupportedScreen() {
             contentDescription = "Bluetooth Not Supported Logo",
             modifier = Modifier.size(150.dp)
         )
-        Text(text = "Votre appareil ne supporte pas le Bluetooth", modifier = Modifier.padding(16.dp))
+        Text(
+            text = "Votre appareil ne supporte pas le Bluetooth",
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
