@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -65,17 +63,18 @@ fun ScanActivityUI(
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun DisplayBluetoothStatus(context: Context, status: String) {
-    val scanInteraction = ScanComposableInteraction(
-        mutableStateOf(false),
-        mutableStateOf(false),
-        mutableStateOf(emptyList()),
-        mutableStateOf(""),
-        {}
-    )
     when (status) {
         "notSupported" -> BluetoothNotSupportedScreen()
         "disabled" -> BluetoothDisabledScreen()
-        "enabled" -> ScanActivityUI(scanInteraction)
+        "enabled" -> {
+            val scanInteraction = ScanComposableInteraction(
+                mutableStateOf(false),
+                mutableStateOf(false),
+                mutableStateOf(emptyList()),
+                mutableStateOf("")
+            ) {}
+            ScanActivityUI(scanInteraction)
+        }
     }
 }
 
@@ -152,7 +151,7 @@ class ScanComposableInteraction(
         isSquareIcon.value = !isSquareIcon.value
         isScanning.value = !isScanning.value
 
-        // Si le scan est activé, affichez les appareils
+        // If scanning is enabled, display the devices
         if (isScanning.value) {
             deviceResults.value = fakeDevices
         } else {
@@ -160,6 +159,7 @@ class ScanComposableInteraction(
         }
     }
 }
+
 @Composable
 fun DisplayDevices(isScanning: MutableState<Boolean>, devices: List<Device>) {
     if (isScanning.value) {
@@ -198,7 +198,7 @@ fun DistanceIndicator(distance: Int) {
             text = "$distance m",
             color = Color.White,
 
-        )
+            )
     }
 }
 
