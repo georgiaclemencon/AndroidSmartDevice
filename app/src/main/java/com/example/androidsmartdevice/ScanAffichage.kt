@@ -1,25 +1,24 @@
 import android.annotation.SuppressLint
 import android.bluetooth.le.ScanResult
-import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import com.example.androidsmartdevice.BleScanManager
 import com.example.androidsmartdevice.R
 
 @Composable
@@ -46,7 +46,9 @@ fun ScanActivityUI(
             modifier = Modifier
                 .size(150.dp)
                 .padding(16.dp)
-                .clickable(onClick = scanInteraction::toggleButtonPlayScan)
+                .clickable(onClick = {
+                    scanInteraction.toggleButtonPlayScan(scanInteraction.deviceResults)
+                })
         )
 
         Text(
@@ -55,43 +57,39 @@ fun ScanActivityUI(
         )
         if (scanInteraction.isScanning.value) {
             LinearProgressIndicator(modifier = Modifier.padding(16.dp))
-            DisplayDevices(scanInteraction.isScanning, scanInteraction.deviceResults.value)
+        } else {
+            Spacer(modifier = Modifier.height(16.dp))
         }
+        DisplayDevices(scanInteraction.isScanning, scanInteraction.deviceResults)
     }
 }
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
-fun DisplayBluetoothStatus(context: Context, status: String) {
-    when (status) {
-        "notSupported" -> BluetoothNotSupportedScreen()
+fun DisplayBluetoothStatus(scanComposableInteraction: ScanComposableInteraction) {
+    when (scanComposableInteraction.hasBLEIssue.value) {
+        "not_supported" -> BluetoothNotSupportedScreen()
         "disabled" -> BluetoothDisabledScreen()
         "enabled" -> {
-            val scanInteraction = ScanComposableInteraction(
-                mutableStateOf(false),
-                mutableStateOf(false),
-                mutableStateOf(emptyList()),
-                mutableStateOf("")
-            ) {}
-            ScanActivityUI(scanInteraction)
+            ScanActivityUI(scanComposableInteraction)
         }
     }
 }
 
 // Display the list of connected devices
-@Composable
-fun DisplayDevices(isScanning: Boolean, devices: List<String>) {
-    if (isScanning) {
-        devices.forEach { device ->
-            Text(text = device, modifier = Modifier.padding(16.dp))
-        }
-    }
-}
+//@Composable
+//fun DisplayDevices(isScanning: Boolean, devices: List<String>) {
+//    if (isScanning) {
+//        devices.forEach { device ->
+//            Text(text = device, modifier = Modifier.padding(16.dp))
+//        }
+//    }
+//}
 
-@Composable
-fun ScanActivityContent(scanInteraction: ScanComposableInteraction) {
-    ScanActivityUI(scanInteraction)
-}
+//@Composable
+//fun ScanActivityContent(scanInteraction: ScanComposableInteraction) {
+//    ScanActivityUI(scanInteraction)
+//}
 
 @Composable
 fun BluetoothDisabledScreen() {
@@ -131,59 +129,71 @@ fun BluetoothNotSupportedScreen() {
 }
 
 
-data class Device(val name: String, val macAddress: String, val distance: Int)
-
-val fakeDevices = listOf(
-    Device("Device 1", "00:11:22:33:44:55", 10),
-    Device("Device 2", "66:77:88:99:AA:BB", 20),
-    Device("Device 3", "CC:DD:EE:FF:00:11", 30),
-    Device("Device 4", "22:33:44:55:66:77", 40),
-)
+//data class Device(val name: String, val macAddress: String, val distance: Int)
+//
+//val fakeDevices = listOf(
+//    Device("Device 1", "00:00:00:00:00:00", 5),
+//    Device("Device 2", "00:00:00:00:00:01", 10),
+//    Device("Device 3", "00:00:00:00:00:02", 15),
+//    Device("Device 4", "00:00:00:00:00:03", 20)
+//)
 
 class ScanComposableInteraction(
     var isScanning: MutableState<Boolean>,
     var isSquareIcon: MutableState<Boolean>,
-    var deviceResults: MutableState<List<Device>>, // Changed from List<String> to List<Device>
+    var deviceResults: MutableList<ScanResult>,
     val hasBLEIssue: MutableState<String>,
-    val onIconClick: (ScanResult) -> Unit
+//    val onIconClick: Unit,
+    val bleScanManager: BleScanManager
 ) {
-    fun toggleButtonPlayScan() {
+    fun toggleButtonPlayScan(scanResults: List<ScanResult>) {
+        if (isScanning.value) {
+            isScanning.value = false
+            stopBleScan()
+        } else {
+            isScanning.value = true
+            startBleScan()
+        }
         isSquareIcon.value = !isSquareIcon.value
-        isScanning.value = !isScanning.value
 
         // If scanning is enabled, display the devices
-        if (isScanning.value) {
-            deviceResults.value = fakeDevices
-        } else {
-            deviceResults.value = emptyList()
-        }
+//        if (isScanning.value) {
+//            deviceResults.addAll(scanResults)
+//        } else {
+//            deviceResults.clear()
+//        }toggleButtonPlayScan
+    }
+
+    private fun startBleScan() {
+        deviceResults.clear()
+        bleScanManager.scanBleDevices()
+    }
+
+    private fun stopBleScan() {
+        bleScanManager.stopBleScan()
     }
 }
 
 @Composable
-fun DisplayDevices(isScanning: MutableState<Boolean>, devices: List<Device>) {
-    if (isScanning.value) {
-        LazyColumn {
-            items(devices) { device ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(text = device.name)
-                        Text(text = "MAC Address: ${device.macAddress}")
-                        DistanceIndicator(distance = device.distance)
-                    }
+@SuppressLint("MissingPermission")
+fun DisplayDevices(isScanning: MutableState<Boolean>, results: MutableList<ScanResult>) {
+    LazyColumn {
+        item { Text("Résultats du scan BLE :") }
+        items(results) { result ->
+            Box(modifier = Modifier.padding(16.dp).background(Color.Transparent).fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Nom du périphérique : ${result.device.name ?: "Inconnu"}")
+                    Text("Adresse MAC : ${result.device.address}")
+                    Text("Force du signal (RSSI) : ${result.rssi} dBm")
+                    Text("Services annoncés : ${result.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
+                    DistanceIndicator(result.rssi)
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
+
 
 @Composable
 fun DistanceIndicator(distance: Int) {
