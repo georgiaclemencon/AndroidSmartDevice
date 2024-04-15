@@ -61,20 +61,23 @@ fun ScanActivityUI(
             Spacer(modifier = Modifier.height(16.dp))
         }
         DisplayDevices(scanInteraction.isScanning, scanInteraction.deviceResults)
+//        DisplayTempDevice(arrayListOf())
     }
 }
 
-@SuppressLint("UnrememberedMutableState")
-@Composable
-fun DisplayBluetoothStatus(scanComposableInteraction: ScanComposableInteraction) {
-    when (scanComposableInteraction.hasBLEIssue.value) {
-        "not_supported" -> BluetoothNotSupportedScreen()
-        "disabled" -> BluetoothDisabledScreen()
-        "enabled" -> {
-            ScanActivityUI(scanComposableInteraction)
-        }
-    }
-}
+
+//
+//@SuppressLint("UnrememberedMutableState")
+//@Composable
+//fun DisplayBluetoothStatus(scanComposableInteraction: ScanComposableInteraction) {
+//    when (scanComposableInteraction.hasBLEIssue.value) {
+//        "not_supported" -> BluetoothNotSupportedScreen()
+//        "disabled" -> BluetoothDisabledScreen()
+//        "enabled" -> {
+//            ScanActivityUI(scanComposableInteraction)
+//        }
+//    }
+//}
 
 // Display the list of connected devices
 //@Composable
@@ -174,21 +177,36 @@ class ScanComposableInteraction(
     }
 }
 
+@SuppressLint("MissingPermission")
+@Composable
+fun DisplayTempDevice(device: List<ScanResult>) {
+    LazyColumn {
+        items(device) { result ->
+            Text(text = "Nom du périphérique : ${result.device.name ?: "Inconnu"}")
+        }
+    }
+}
+
+
 @Composable
 @SuppressLint("MissingPermission")
 fun DisplayDevices(isScanning: MutableState<Boolean>, results: MutableList<ScanResult>) {
     LazyColumn {
-        item { Text("Résultats du scan BLE :") }
+        // item { Text("Résultats du scan BLE :") }
         items(results) { result ->
-            Box(modifier = Modifier.padding(16.dp).background(Color.Transparent).fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Nom du périphérique : ${result.device.name ?: "Inconnu"}")
-                    Text("Adresse MAC : ${result.device.address}")
-                    Text("Force du signal (RSSI) : ${result.rssi} dBm")
-                    Text("Services annoncés : ${result.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
-                    DistanceIndicator(result.rssi)
-                }
+
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
+                Text("Nom du périphérique : ${result.device.name ?: "Inconnu"}")
+                Text("Adresse MAC : ${result.device.address}")
+                Text("Force du signal (RSSI) : ${result.rssi} dBm")
+                Text("Services annoncés : ${result.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
+                DistanceIndicator(result.rssi)
             }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

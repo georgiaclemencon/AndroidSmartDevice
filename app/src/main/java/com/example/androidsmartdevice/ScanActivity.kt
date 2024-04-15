@@ -1,15 +1,13 @@
 // ScanActivity.kt
 package com.example.androidsmartdevice
 
+//import Device
 import BluetoothDisabledScreen
 import BluetoothNotSupportedScreen
-//import Device
-import DisplayBluetoothStatus
 import ScanActivityUI
 import ScanComposableInteraction
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanResult
@@ -23,11 +21,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
@@ -54,22 +50,22 @@ class ScanActivity : ComponentActivity() {
 
     private lateinit var scanInteraction: ScanComposableInteraction
 
-    @SuppressLint("UnrememberedMutableState")
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
 
-            btManager = getSystemService(BluetoothManager::class.java)
-            bleScanManager = BleScanManager(btManager, 10000, scanCallback = BleScanCallback({ result ->
-                if (result != null){
-                    Log.d("BleScanner", "Nouveau résultat du scan : $result")
-                    scanResults.add(result)
-                }
-            }))
+        btManager = getSystemService(BluetoothManager::class.java)
+        bleScanManager = BleScanManager(btManager, 10000, scanCallback = BleScanCallback({ result ->
+            if (result != null) {
+                Log.d("BleScanner", "Nouveau résultat du scan : $result")
+                scanResults.add(result)
+            }
+        }))
 
         setContent {
 
-            val isScanning by remember { mutableStateOf(false) }
+            val isScanning = remember { mutableStateOf(false) }
             val hasBLEIssue = remember { mutableStateOf("") }
 //            val scanResult = remember { mutableListOf<String>() }
 //            val devices = remember { mutableStateOf(listOf<ScanResult>()) }
@@ -79,77 +75,62 @@ class ScanActivity : ComponentActivity() {
             val isSquareIcon = remember { mutableStateOf(false) }
 
             scanInteraction = ScanComposableInteraction(
-                isScanning = mutableStateOf(isScanning),
+                isScanning = isScanning,
                 isSquareIcon = isSquareIcon,
                 deviceResults = this.scanResults,
                 hasBLEIssue = hasBLEIssue,
                 bleScanManager = bleScanManager,
             )
 
-            checkBluetoothStatus(this, requestMultiplePermissionsLauncher, scanInteraction)
 
-            // Use scanInteraction in your composable functions
-            // For example:
-            when (scanInteraction.hasBLEIssue.value) {
-                "not_supported" -> BluetoothNotSupportedScreen()
-                "disabled" -> BluetoothDisabledScreen()
-                "enabled" -> ScanActivityUI(scanInteraction)
-            }
+
+
+            checkBluetoothStatus(this, requestMultiplePermissionsLauncher, scanInteraction)
+            DisplayBluetoothStatus(scanInteraction)
+
         }
     }
 
 
 
-//    private fun isBluetoothSupported(): BluetoothAdapter? {
-//        return BluetoothAdapter.getDefaultAdapter()
-//    }
-//
-//    private fun isBluetoothEnabled(bluetoothAdapter: BluetoothAdapter?): Boolean {
-//        return bluetoothAdapter?.isEnabled ?: false
-//    }
-//
-//    private fun requestBluetoothPermission(
-//        context: Context,
-//        requestMultiplePermissionsLauncher: ActivityResultLauncher<Array<String>>
-//    ) {
-//        val permissions = arrayOf(
-//            Manifest.permission.BLUETOOTH,
-//            Manifest.permission.BLUETOOTH_ADMIN,
-//            Manifest.permission.ACCESS_FINE_LOCATION,
-//            Manifest.permission.ACCESS_COARSE_LOCATION
-//        )
-//        requestMultiplePermissionsLauncher.launch(permissions)
-//    }
+private fun checkBluetoothStatus(
+    context: Context,
+    requestMultiplePermissionsLauncher: ActivityResultLauncher<Array<String>>,
+    scanComposableInteraction: ScanComposableInteraction
+): Boolean {
+    val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
 
-
-    @Composable
-    private fun checkBluetoothStatus(
-        context: Context,
-        requestMultiplePermissionsLauncher: ActivityResultLauncher<Array<String>>,
-        scanComposableInteraction: ScanComposableInteraction
-    ): Boolean {
-        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-
-        if (bluetoothAdapter == null) {
-            scanComposableInteraction.hasBLEIssue.value = "notSupported"
-            DisplayBluetoothStatus(scanComposableInteraction)
+    if (bluetoothAdapter == null) {
+        scanComposableInteraction.hasBLEIssue.value = "notSupported"
+        return false
+    } else {
+        if (!bluetoothAdapter.isEnabled) {
+            scanComposableInteraction.hasBLEIssue.value = "disabled"
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.BLUETOOTH
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                context.startActivity(enableBtIntent)
+            } else {
+                requestMultiplePermissionsLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION))
+            }
             return false
         } else {
-            if (!bluetoothAdapter.isEnabled) {
-                scanComposableInteraction.hasBLEIssue.value = "disabled"
-                DisplayBluetoothStatus(scanComposableInteraction)
-                if (ContextCompat.checkSelfPermission(context,Manifest.permission.BLUETOOTH) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                    context.startActivity(enableBtIntent)
-                } else {
-                    requestMultiplePermissionsLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH))
-                }
-                return false
-            } else {
-                scanComposableInteraction.hasBLEIssue.value = "enabled"
-                DisplayBluetoothStatus(scanComposableInteraction)
-                return areAllPermissionsGranted(context)
+            scanComposableInteraction.hasBLEIssue.value = "enabled"
+            return areAllPermissionsGranted(context)
+        }
+    }
+}
+    @SuppressLint("UnrememberedMutableState")
+    @Composable
+    fun DisplayBluetoothStatus(scanComposableInteraction: ScanComposableInteraction) {
+        when (scanComposableInteraction.hasBLEIssue.value) {
+            "not_supported" -> BluetoothNotSupportedScreen()
+            "disabled" -> BluetoothDisabledScreen()
+            "enabled" -> {
+                ScanActivityUI(scanComposableInteraction)
             }
         }
     }
@@ -169,26 +150,27 @@ class ScanActivity : ComponentActivity() {
             ) == PackageManager.PERMISSION_GRANTED
         }
     }
+
+    fun bleScannerResults(results: MutableList<ScanResult>) {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // Request the missing permissions
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
+                REQUEST_CODE_BLUETOOTH_PERMISSIONS
+            )
+        }
+
+    }
 }
 
 // **********SCAN BLE *********
-@Composable
-fun BleScannerResults(results: MutableList<ScanResult>) {
-    val context = LocalContext.current
-    if (ActivityCompat.checkSelfPermission(
-            context,
-            Manifest.permission.BLUETOOTH_CONNECT
-        ) != PackageManager.PERMISSION_GRANTED
-    ) {
-        // Request the missing permissions
-        ActivityCompat.requestPermissions(
-            context as Activity,
-            arrayOf(Manifest.permission.BLUETOOTH_CONNECT),
-            REQUEST_CODE_BLUETOOTH_PERMISSIONS
-        )
-    }
 
-}
+
 // Define a constant for the request code
 const val REQUEST_CODE_BLUETOOTH_PERMISSIONS = 1001
 

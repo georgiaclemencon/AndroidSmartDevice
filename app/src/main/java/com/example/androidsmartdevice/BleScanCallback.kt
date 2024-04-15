@@ -2,14 +2,15 @@ package com.example.androidsmartdevice
 
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.widget.Toast
 
 /**
- * This class is a custom implementation of the ScanCallback class.
- * It provides custom actions for when a scan result is received, when a batch of scan results is received, and when a scan fails.
- *e
- * @property onScanResultAction The action to perform when a scan result is received.
- * @property onBatchScanResultAction The action to perform when a batch of scan results is received.
- * @property onScanFailedAction The action to perform when a scan fails.
+ * Cette classe est une implémentation personnalisée de la classe ScanCallback.
+ * Elle fournit des actions personnalisées pour quand un résultat de scan est reçu, quand un lot de résultats de scan est reçu, et quand un scan échoue.
+ *
+ * @property onScanResultAction L'action à effectuer lorsqu'un résultat de scan est reçu.
+ * @property onBatchScanResultAction L'action à effectuer lorsqu'un lot de résultats de scan est reçu.
+ * @property onScanFailedAction L'action à effectuer lorsqu'un scan échoue.
  */
 class BleScanCallback(
     private val onScanResultAction: (ScanResult?) -> Unit = {},
@@ -18,10 +19,10 @@ class BleScanCallback(
 ) : ScanCallback() {
 
     /**
-     * This function is called when a BLE advertisement has been found.
+     * Cette fonction est appelée lorsqu'une publicité BLE a été trouvée.
      *
-     * @param callbackType The type of callback that triggered this function.
-     * @param result The scan result that contains information about the remote device as well as the scan record of the advertisement.
+     * @param callbackType Le type de rappel qui a déclenché cette fonction.
+     * @param result Le résultat du scan qui contient des informations sur le périphérique distant ainsi que l'enregistrement du scan de la publicité.
      */
     override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult?) {
         super.onScanResult(callbackType, result)
@@ -29,10 +30,10 @@ class BleScanCallback(
     }
 
     /**
-     * This function is called to deliver batch scan results.
-     * These are BLE advertisements that were previously scanned.
+     * Cette fonction est appelée pour livrer des résultats de scan en lot.
+     * Ce sont des publicités BLE qui ont été précédemment scannées.
      *
-     * @param results List of scan results that are previously scanned.
+     * @param results Liste des résultats de scan qui ont été précédemment scannés.
      */
     override fun onBatchScanResults(results: MutableList<android.bluetooth.le.ScanResult>?) {
         super.onBatchScanResults(results)
@@ -40,12 +41,13 @@ class BleScanCallback(
     }
 
     /**
-     * This function is called when scan could not be started.
+     * Cette fonction est appelée lorsque le scan n'a pas pu être démarré.
      *
-     * @param errorCode The error code related to the failure.
+     * @param errorCode Le code d'erreur lié à l'échec.
      */
     override fun onScanFailed(errorCode: Int) {
         super.onScanFailed(errorCode)
+//        Toast.makeText(this, "Erreur de scan : $errorCode", Toast.LENGTH_SHORT).show()
         onScanFailedAction(errorCode)
     }
 }
