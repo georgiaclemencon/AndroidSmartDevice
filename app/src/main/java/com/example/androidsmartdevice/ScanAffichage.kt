@@ -1,5 +1,9 @@
 import android.annotation.SuppressLint
 import android.bluetooth.le.ScanResult
+import android.content.Context
+import android.content.Intent
+import android.location.LocationManager
+import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.androidsmartdevice.BleScanManager
+import com.example.androidsmartdevice.DeviceActivity
 import com.example.androidsmartdevice.R
 
 @Composable
@@ -60,8 +65,7 @@ fun ScanActivityUI(
         } else {
             Spacer(modifier = Modifier.height(16.dp))
         }
-        DisplayDevices(scanInteraction.isScanning, scanInteraction.deviceResults)
-//        DisplayTempDevice(arrayListOf())
+        DisplayDevices(scanInteraction.isScanning, scanInteraction.deviceResults )
     }
 }
 
@@ -177,40 +181,36 @@ class ScanComposableInteraction(
     }
 }
 
-@SuppressLint("MissingPermission")
-@Composable
-fun DisplayTempDevice(device: List<ScanResult>) {
-    LazyColumn {
-        items(device) { result ->
-            Text(text = "Nom du périphérique : ${result.device.name ?: "Inconnu"}")
-        }
-    }
-}
-
 
 @Composable
 @SuppressLint("MissingPermission")
 fun DisplayDevices(isScanning: MutableState<Boolean>, results: MutableList<ScanResult>) {
+    val context = LocalContext.current // Get the current context
     LazyColumn {
-        // item { Text("Résultats du scan BLE :") }
         items(results) { result ->
-
             Column(
                 modifier = Modifier
                     .padding(16.dp)
                     .fillMaxWidth()
+                    .clickable {
+                        // Create an Intent to start DeviceActivity
+                        val intent = Intent(context, DeviceActivity::class.java)
+                        // Put the device address as an extra in the Intent
+                        intent.putExtra("device_address", result.device.address)
+                        intent.putExtra("device_name", result.device.name)
+                        intent.putExtra("device_rssi", result.rssi)
+                        // Start DeviceActivity
+                        context.startActivity(intent)
+                    }
             ) {
-                Text("Nom du périphérique : ${result.device.name ?: "Inconnu"}")
-                Text("Adresse MAC : ${result.device.address}")
-                Text("Force du signal (RSSI) : ${result.rssi} dBm")
-                Text("Services annoncés : ${result.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
-                DistanceIndicator(result.rssi)
+                DisplayDeviceUnit(result)
             }
-
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
+
+
 
 
 @Composable
@@ -219,7 +219,7 @@ fun DistanceIndicator(distance: Int) {
         modifier = Modifier
             .size(50.dp)
             .clip(CircleShape)
-            .background(color = if (distance < 10) Color.Green else Color.Red),
+            .background(color = if (distance < 1) Color.Green else Color.Red),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -229,5 +229,36 @@ fun DistanceIndicator(distance: Int) {
             )
     }
 }
-
-
+@SuppressLint("MissingPermission")
+@Composable
+fun DisplayDeviceUnit(device: ScanResult) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+    ) {
+        Text("Nom du périphérique : ${device.device.name ?: "Inconnu"}")
+        Text("Adresse MAC : ${device.device.address}")
+        Text("Force du signal (RSSI) : ${device.rssi} dBm")
+        Text("Services annoncés : ${device.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
+        DistanceIndicator(device.rssi)
+    }
+}
+//@SuppressLint("MissingPermission")
+//
+//@Composable
+//fun DeviceDetail(device: ScanResult) {
+//    Column(
+//        modifier = Modifier
+//            .padding(16.dp)
+//            .fillMaxWidth()
+//    ) {
+//        Text("Nom du périphérique : ${device.device.name ?: "Inconnu"}")
+//        Text("Adresse MAC : ${device.device.address}")
+//        Text("Type de périphérique : ${device.device.type}")
+//        Text("Etat de la liaison : ${device.device.bondState}")
+//        Text("Force du signal (RSSI) : ${device.rssi} dBm")
+//        Text("Services annoncés : ${device.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
+//        DistanceIndicator(device.rssi)
+//    }
+//}
