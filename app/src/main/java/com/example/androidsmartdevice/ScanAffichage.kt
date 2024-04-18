@@ -1,9 +1,7 @@
+
 import android.annotation.SuppressLint
 import android.bluetooth.le.ScanResult
-import android.content.Context
 import android.content.Intent
-import android.location.LocationManager
-import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.example.androidsmartdevice.BleScanManager
 import com.example.androidsmartdevice.DeviceActivity
 import com.example.androidsmartdevice.R
+
 
 @Composable
 fun ScanActivityUI(
@@ -212,7 +211,6 @@ fun DisplayDevices(isScanning: MutableState<Boolean>, results: MutableList<ScanR
 
 
 
-
 @Composable
 fun DistanceIndicator(distance: Int) {
     Box(
@@ -244,21 +242,4 @@ fun DisplayDeviceUnit(device: ScanResult) {
         DistanceIndicator(device.rssi)
     }
 }
-//@SuppressLint("MissingPermission")
-//
-//@Composable
-//fun DeviceDetail(device: ScanResult) {
-//    Column(
-//        modifier = Modifier
-//            .padding(16.dp)
-//            .fillMaxWidth()
-//    ) {
-//        Text("Nom du périphérique : ${device.device.name ?: "Inconnu"}")
-//        Text("Adresse MAC : ${device.device.address}")
-//        Text("Type de périphérique : ${device.device.type}")
-//        Text("Etat de la liaison : ${device.device.bondState}")
-//        Text("Force du signal (RSSI) : ${device.rssi} dBm")
-//        Text("Services annoncés : ${device.scanRecord?.serviceUuids?.joinToString() ?: "Aucun"}")
-//        DistanceIndicator(device.rssi)
-//    }
-//}
+
