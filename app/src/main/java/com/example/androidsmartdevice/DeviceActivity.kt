@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -23,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.example.androidsmartdevice.ui.theme.AndroidSmartDeviceTheme
+import java.util.UUID
 
 class DeviceActivity : ComponentActivity() {
     private lateinit var btManager: BluetoothManager
@@ -81,14 +83,20 @@ class DeviceActivity : ComponentActivity() {
                         onNotificationSubscribe = {
                             // Ajoutez ici le code pour gérer l'abonnement aux notifications
                             // Supposons que vous recevez une notification ici
-                            notificationCounter.value = (notificationCounter.value.toInt() + 1).toString()
+                            notificationCounter.value =
+                                (notificationCounter.value.toInt() + 1).toString()
                         }
                     )
 
+
                     DeviceDetail(deviceInteraction) {
                         connectToDevice()
+
+
                     }
+
                 }
+
 
             }
         }
@@ -97,6 +105,7 @@ class DeviceActivity : ComponentActivity() {
 
     @SuppressLint("MissingPermission")
     private fun connectToDevice() {
+
         bluetoothGatt = bluetoothDevice.connectGatt(this, false, object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                 when (newState) {
@@ -106,6 +115,9 @@ class DeviceActivity : ComponentActivity() {
                             "BluetoothGatt", "Attempting to start service discovery: " +
                                     gatt.discoverServices()
                         )
+                        connectionStateChange(gatt, newState)
+
+
                         runOnUiThread {
                             Toast.makeText(
                                 this@DeviceActivity,
@@ -130,9 +142,62 @@ class DeviceActivity : ComponentActivity() {
                     }
                 }
             }
+            private val gattCallback = object : BluetoothGattCallback() {
+                override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+                    val deviceAddress = gatt.device.address
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            Log.w("BluetoothGattCallback", "Successfully connected to $deviceAddress")
+                            // TODO: Store a reference to BluetoothGatt
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                            Log.w("BluetoothGattCallback", "Successfully disconnected from $deviceAddress")
+                            gatt.close()
+                        }
+                    } else {
+                        Log.w("BluetoothGattCallback", "Error $status encountered for $deviceAddress! Disconnecting...")
+                        gatt.close()
+                    }
+                }
+            }
+
+            override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+                if (Looper.myLooper() == null) {
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        val gattTable = gatt.getGattTable()
+                        gattTable.forEach { (serviceUuid, characteristicUuids) ->
+                            Log.i("BluetoothGatt", "Service UUID: $serviceUuid")
+                            characteristicUuids.forEach { characteristicUuid ->
+                                Log.i("BluetoothGatt", "Characteristic UUID: $characteristicUuid")
+                            }
+                        }
+                    } else {
+                        Log.w("BluetoothGatt", "onServicesDiscovered received: $status")
+                    }
+                }
+            }
+
+
         })
     }
 
+    private fun BluetoothGatt.getGattTable(): Map<UUID, List<UUID>> {
+        val gattTable = mutableMapOf<UUID, List<UUID>>()
+
+        if (services.isEmpty()) {
+            Log.i(
+                "getGattTable",
+                "No service and characteristic available, call discoverServices() first?"
+            )
+            return gattTable
+        }
+
+        services.forEach { service ->
+            val characteristics = service.characteristics.map { it.uuid }
+            gattTable[service.uuid] = characteristics
+        }
+
+        return gattTable
+    }
 
 
     @SuppressLint("MissingPermission")
@@ -146,26 +211,31 @@ class DeviceActivity : ComponentActivity() {
     }
 
 
-   private fun turnOnLight(index: Int, newLedState: LEDStateEnum, ledStates: List<MutableState<Boolean>>) {
-    if (currentLEDStateEnum != newLedState) {
-        ledStates.forEach { it.value = false }
-        ledStates[index].value = !ledStates[index].value
-        currentLEDStateEnum = newLedState
-    } else {
-        ledStates.forEach { it.value = false }
-        currentLEDStateEnum = LEDStateEnum.NONE
+    private fun turnOnLight(
+        index: Int,
+        newLedState: LEDStateEnum,
+        ledStates: List<MutableState<Boolean>>
+    ) {
+        if (currentLEDStateEnum != newLedState) {
+            ledStates.forEach { it.value = false }
+            ledStates[index].value = !ledStates[index].value
+            currentLEDStateEnum = newLedState
+        } else {
+            ledStates.forEach { it.value = false }
+            currentLEDStateEnum = LEDStateEnum.NONE
+        }
+        //writeToLEDCharacteristic(currentLEDStateEnum)
     }
-    // writeToLEDCharacteristic(currentLEDStateEnum)
-}
+
     override fun onStop() {
         super.onStop()
         closeBluetoothGatt()
     }
 
+    @SuppressLint("MissingPermission")
     private fun closeBluetoothGatt() {
-        TODO("Not yet implemented")
+        bluetoothGatt.close()
     }
-
 
 
 }

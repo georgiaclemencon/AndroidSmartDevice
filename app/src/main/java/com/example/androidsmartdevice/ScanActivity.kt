@@ -2,6 +2,7 @@
 package com.example.androidsmartdevice
 
 //import Device
+
 import BluetoothDisabledScreen
 import BluetoothNotSupportedScreen
 import ScanActivityUI
@@ -14,7 +15,6 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -29,9 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.io.Serializable
-
-import android.provider.Settings
-import android.widget.Toast
 
 
 class ScanActivity : ComponentActivity() {
@@ -68,7 +65,7 @@ class ScanActivity : ComponentActivity() {
         btManager = getSystemService(BluetoothManager::class.java)
         bleScanManager = BleScanManager(btManager, 10000, scanCallback = BleScanCallback({ result ->
             if (result != null) {
-                Log.d("BleScanner", "Nouveau résultat du scan : $result")
+               // Log.d("BleScanner", "Nouveau résultat du scan : $result")
                 scanResults.add(result)
             }
         }))
@@ -105,8 +102,6 @@ class ScanActivity : ComponentActivity() {
     }
 
 
-
-
     private fun checkBluetoothStatus(
         context: Context,
         requestMultiplePermissionsLauncher: ActivityResultLauncher<Array<String>>,
@@ -128,7 +123,12 @@ class ScanActivity : ComponentActivity() {
                     val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                     context.startActivity(enableBtIntent)
                 } else {
-                    requestMultiplePermissionsLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH, Manifest.permission.ACCESS_FINE_LOCATION))
+                    requestMultiplePermissionsLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.BLUETOOTH,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        )
+                    )
                 }
                 return false
             } else {
@@ -137,6 +137,7 @@ class ScanActivity : ComponentActivity() {
             }
         }
     }
+
     @SuppressLint("UnrememberedMutableState")
     @Composable
     fun DisplayBluetoothStatus(scanComposableInteraction: ScanComposableInteraction) {
@@ -161,7 +162,8 @@ class ScanActivity : ComponentActivity() {
                     Manifest.permission.BLUETOOTH_CONNECT,
                     Manifest.permission.BLUETOOTH_SCAN,
                     Manifest.permission.BLUETOOTH_ADMIN
-                ))
+                )
+            )
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissions = permissions.plus(
                 Manifest.permission.ACCESS_BACKGROUND_LOCATION
@@ -171,19 +173,19 @@ class ScanActivity : ComponentActivity() {
     }
 
     private fun scanLeDeviceswithPermissions() {
-        if (areAllPermissionsGranted()) {
-            bleScanManager.scanBleDevices()
-        } else {
+        if (!areAllPermissionsGranted()) {
             requestMultiplePermissionsLauncher.launch(getRequiredPermissions())
         }
     }
 
 
-
     private fun areAllPermissionsGranted(): Boolean {
         val permissionsList = getRequiredPermissions()
         val retVal = permissionsList.all { permission ->
-            ActivityCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+            ActivityCompat.checkSelfPermission(
+                this,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
         }
         Log.d("Permissions", "All permissions granted: $retVal")
         return retVal
@@ -202,8 +204,6 @@ class ScanActivity : ComponentActivity() {
 //            context.startActivity(intent)
 //        }
 //    }
-
-
 
 
 //fun bleScannerResults(results: MutableList<ScanResult>) {

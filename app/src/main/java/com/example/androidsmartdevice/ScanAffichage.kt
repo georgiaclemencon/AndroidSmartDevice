@@ -195,10 +195,12 @@ fun DisplayDevices(isScanning: MutableState<Boolean>, results: MutableList<ScanR
                         // Create an Intent to start DeviceActivity
                         val intent = Intent(context, DeviceActivity::class.java)
                         // Put the device address as an extra in the Intent
+                        intent.putExtra("device", result.device)
                         intent.putExtra("device_address", result.device.address)
                         intent.putExtra("device_name", result.device.name)
                         intent.putExtra("device_rssi", result.rssi)
                         // Start DeviceActivity
+
                         context.startActivity(intent)
                     }
             ) {

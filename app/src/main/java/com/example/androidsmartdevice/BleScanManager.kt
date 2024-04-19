@@ -1,14 +1,10 @@
 package com.example.androidsmartdevice
 
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.os.Handler
 import android.os.Looper
-import android.bluetooth.le.BluetoothLeScanner
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 
 class BleScanManager(
     btManager: BluetoothManager,
@@ -30,20 +26,13 @@ class BleScanManager(
      */
     @SuppressLint("MissingPermission")
     fun scanBleDevices() {
-        fun stopScan() {
-            scanning = false
-            bleScanner.stopScan(scanCallback)
-
-        }
 
         // scans for bluetooth LE devices
         if (scanning) {
-            stopScan()
+            stopBleScan()
         } else {
             // stops scanning after scanPeriod millis
-            handler.postDelayed({ stopScan() }, scanPeriod)
-
-
+            handler.postDelayed({ stopBleScan() }, scanPeriod)
             // starts scanning
             scanning = true
             bleScanner.startScan(scanCallback)
@@ -51,6 +40,7 @@ class BleScanManager(
     }
     @SuppressLint("MissingPermission")
     fun stopBleScan() {
+        scanning = false
         bleScanner.stopScan(scanCallback)
     }
 
