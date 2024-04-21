@@ -1,6 +1,7 @@
 package com.example.androidsmartdevice
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -9,8 +10,8 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -81,17 +82,22 @@ class DeviceActivity : ComponentActivity() {
                         LedArray = ledArray,
                         notificationCounter = notificationCounter.value,
                         onNotificationSubscribe = {
-                            // Ajoutez ici le code pour gérer l'abonnement aux notifications
-                            // Supposons que vous recevez une notification ici
+
                             notificationCounter.value =
                                 (notificationCounter.value.toInt() + 1).toString()
-                        }
+                        },
+                        Services = mutableListOf()
                     )
 
+                    val deviceInteractionDisplay = remember { mutableStateOf(deviceInteraction) }
 
-                    DeviceDetail(deviceInteraction) {
-                        connectToDevice()
 
+                    if (this::deviceInteraction.isInitialized) {
+                        DeviceDetail(deviceInteractionDisplay) {
+                            connectToDevice()
+                        }
+                    } else {
+                        Log.i("DeviceActivity", "DeviceInteraction not initialized")
 
                     }
 
@@ -101,6 +107,28 @@ class DeviceActivity : ComponentActivity() {
             }
         }
     }
+
+    @SuppressLint("MissingPermission")
+    fun writeCharacteristic(characteristic: BluetoothGattCharacteristic, payload: ByteArray) {
+        val writeType = when {
+            characteristic.isWritable() -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            characteristic.isWritableWithoutResponse() -> {
+                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            }
+
+            else -> error("Characteristic ${characteristic.uuid} cannot be written to")
+        }
+        bluetoothGatt.let { gatt ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                gatt.writeCharacteristic(characteristic, payload, writeType)
+            } else {
+                // Fall back to deprecated version of writeCharacteristic for Android <13
+                gatt.legacyCharacteristicWrite(characteristic, payload, writeType)
+            }
+        }
+    }
+
+
 
 
     @SuppressLint("MissingPermission")
@@ -142,39 +170,55 @@ class DeviceActivity : ComponentActivity() {
                     }
                 }
             }
+
+
+
+
             private val gattCallback = object : BluetoothGattCallback() {
-                override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+                override fun onConnectionStateChange(
+                    gatt: BluetoothGatt,
+                    status: Int,
+                    newState: Int
+                ) {
                     val deviceAddress = gatt.device.address
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         if (newState == BluetoothProfile.STATE_CONNECTED) {
-                            Log.w("BluetoothGattCallback", "Successfully connected to $deviceAddress")
+                            Log.w(
+                                "BluetoothGattCallback",
+                                "Successfully connected to $deviceAddress"
+                            )
                             // TODO: Store a reference to BluetoothGatt
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                            Log.w("BluetoothGattCallback", "Successfully disconnected from $deviceAddress")
+                            Log.w(
+                                "BluetoothGattCallback",
+                                "Successfully disconnected from $deviceAddress"
+                            )
                             gatt.close()
                         }
                     } else {
-                        Log.w("BluetoothGattCallback", "Error $status encountered for $deviceAddress! Disconnecting...")
+                        Log.w(
+                            "BluetoothGattCallback",
+                            "Error $status encountered for $deviceAddress! Disconnecting..."
+                        )
                         gatt.close()
                     }
                 }
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                if (Looper.myLooper() == null) {
-                    if (status == BluetoothGatt.GATT_SUCCESS) {
-                        val gattTable = gatt.getGattTable()
-                        gattTable.forEach { (serviceUuid, characteristicUuids) ->
-                            Log.i("BluetoothGatt", "Service UUID: $serviceUuid")
-                            characteristicUuids.forEach { characteristicUuid ->
-                                Log.i("BluetoothGatt", "Characteristic UUID: $characteristicUuid")
-                            }
-                        }
-                    } else {
-                        Log.w("BluetoothGatt", "onServicesDiscovered received: $status")
-                    }
-                }
-            }
+    if (status == BluetoothGatt.GATT_SUCCESS) {
+        val gattTable = gatt.getGattTable()
+        gattTable.forEach { (serviceUuid, characteristicUuids) ->
+            Log.i("BluetoothGatt", "Service UUID: $serviceUuid")
+            deviceInteraction.serviceWithCharacteristics.value[serviceUuid] = characteristicUuids
+            Log.i("BluetoothGatt", "deviceInteraction: ${deviceInteraction.serviceWithCharacteristics}")
+        }
+        // Add the discovered services to deviceInteraction.Services
+        deviceInteraction.Services.addAll(gatt.services)
+    } else {
+        Log.w("BluetoothGatt", "onServicesDiscovered received: $status")
+    }
+}
 
 
         })
@@ -224,7 +268,8 @@ class DeviceActivity : ComponentActivity() {
             ledStates.forEach { it.value = false }
             currentLEDStateEnum = LEDStateEnum.NONE
         }
-        //writeToLEDCharacteristic(currentLEDStateEnum)
+        writeToLEDCharacteristic(currentLEDStateEnum)
+        Log.i("DeviceActivity", "Turned on light $index")
     }
 
     override fun onStop() {
@@ -235,6 +280,166 @@ class DeviceActivity : ComponentActivity() {
     @SuppressLint("MissingPermission")
     private fun closeBluetoothGatt() {
         bluetoothGatt.close()
+    }
+
+    fun BluetoothGattCharacteristic.isReadable(): Boolean =
+        containsProperty(BluetoothGattCharacteristic.PROPERTY_READ)
+
+    fun BluetoothGattCharacteristic.isWritable(): Boolean =
+        containsProperty(BluetoothGattCharacteristic.PROPERTY_WRITE)
+
+    fun BluetoothGattCharacteristic.isWritableWithoutResponse(): Boolean =
+        containsProperty(BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)
+
+    fun BluetoothGattCharacteristic.containsProperty(property: Int): Boolean {
+        return properties and property != 0
+    }
+
+
+    @SuppressLint("MissingPermission")
+    private fun readLEDServices() {
+        val LEDServiceUuid = UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb")
+        val LEDLevelCharUuid = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
+        val LEDLevelChar =
+            bluetoothGatt.getService(LEDServiceUuid)?.getCharacteristic(LEDLevelCharUuid)
+
+        if (LEDLevelChar?.isReadable() == true) {
+            bluetoothGatt.readCharacteristic(LEDLevelChar)
+        }
+
+    }
+
+//    @SuppressLint("MissingPermission")
+//    fun writeCharacteristic(characteristic: BluetoothGattCharacteristic, payload: ByteArray) {
+//        val writeType = when {
+//            characteristic.isWritable() -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+//            characteristic.isWritableWithoutResponse() -> {
+//                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+//            }
+//
+//            else -> error("Characteristic ${characteristic.uuid} cannot be written to")
+//        }
+//        bluetoothGatt.let { gatt ->
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+//                gatt.writeCharacteristic(characteristic, payload, writeType)
+//            } else {
+//                // Fall back to deprecated version of writeCharacteristic for Android <13
+//                gatt.legacyCharacteristicWrite(characteristic, payload, writeType)
+//            }
+//        }
+//    }
+
+    @SuppressLint("MissingPermission")
+    @TargetApi(Build.VERSION_CODES.S)
+    @Suppress("DEPRECATION")
+    private fun BluetoothGatt.legacyCharacteristicWrite(
+        characteristic: BluetoothGattCharacteristic,
+        value: ByteArray,
+        writeType: Int
+    ) {
+        characteristic.writeType = writeType
+        characteristic.value = value
+        writeCharacteristic(characteristic)
+    }
+
+    @Deprecated("Deprecated for Android 13+")
+    @Suppress("DEPRECATION")
+    fun onCharacteristicRead(
+        gatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        status: Int
+    ) {
+        with(characteristic) {
+            when (status) {
+                BluetoothGatt.GATT_SUCCESS -> {
+                    val readBytes = value // The byte array from the characteristic
+                    val readString: String = readBytes.toHexString()
+
+                    // If the byte array has at least 1 byte
+                    if (readBytes.isNotEmpty()) {
+                        val ledState = when (readBytes[0]) {
+                            LEDStateEnum.LED_1.hex[0] -> LEDStateEnum.LED_1
+                            LEDStateEnum.LED_2.hex[0] -> LEDStateEnum.LED_2
+                            LEDStateEnum.LED_3.hex[0] -> LEDStateEnum.LED_3
+                            else -> LEDStateEnum.NONE
+                        }
+
+                        Log.i(
+                            "BluetoothGattCallback",
+                            "Read characteristic $uuid:\n$readString, interpreted as $ledState"
+                        )
+                    } else {
+                        Log.i(
+                            "BluetoothGattCallback",
+                            "Read characteristic $uuid:\n$readString"
+                        )
+                    }
+                }
+
+                BluetoothGatt.GATT_READ_NOT_PERMITTED -> {
+                    Log.e("BluetoothGattCallback", "Read not permitted for $uuid!")
+                }
+
+                else -> {
+                    Log.e(
+                        "BluetoothGattCallback",
+                        "Characteristic read failed for $uuid, error: $status"
+                    )
+                }
+            }
+        }
+    }
+
+    fun ByteArray.toHexString(): String =
+        joinToString(separator = " ", prefix = "0x") { String.format("%02X", it) }
+
+
+    @SuppressLint("MissingPermission")
+    private fun writeToLEDCharacteristic(ledState: LEDStateEnum) {
+        ledBluetoothGattCharacteristic?.let { characteristic ->
+            characteristic.value = ledState.hex
+            val isWriteInitiated = bluetoothGatt.writeCharacteristic(characteristic)
+            if (isWriteInitiated) {
+                onCharacteristicWrite(bluetoothGatt, characteristic, BluetoothGatt.GATT_SUCCESS)
+            }
+        }
+    }
+
+    fun onCharacteristicWrite(
+        gatt: BluetoothGatt,
+        characteristic: BluetoothGattCharacteristic,
+        status: Int
+    ) {
+        with(characteristic) {
+            val value = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                characteristic.value
+            } else {
+                TODO("Get from cache somewhere as getValue is deprecated for Android 13+")
+            }
+            when (status) {
+                BluetoothGatt.GATT_SUCCESS -> {
+                    Log.i(
+                        "BluetoothGattCallback",
+                        "Wrote to characteristic $uuid | value: ${value.toHexString()}"
+                    )
+                }
+
+                BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH -> {
+                    Log.e("BluetoothGattCallback", "Write exceeded connection ATT MTU!")
+                }
+
+                BluetoothGatt.GATT_WRITE_NOT_PERMITTED -> {
+                    Log.e("BluetoothGattCallback", "Write not permitted for $uuid!")
+                }
+
+                else -> {
+                    Log.e(
+                        "BluetoothGattCallback",
+                        "Characteristic write failed for $uuid, error: $status"
+                    )
+                }
+            }
+        }
     }
 
 
