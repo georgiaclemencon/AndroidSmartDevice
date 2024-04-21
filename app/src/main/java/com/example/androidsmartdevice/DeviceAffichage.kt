@@ -192,7 +192,5 @@ class DeviceComposableInteraction(
     val serviceWithCharacteristics: MutableState<HashMap<UUID, List<UUID>> > = mutableStateOf(hashMapOf())
 )
 
-data class Service(val uuid: UUID, val characteristics: List<Characteristic>)
-data class Characteristic(val uuid: UUID)
 
 data class Led(var isOn: Boolean, val switchLed: (index: Int) -> Unit)
