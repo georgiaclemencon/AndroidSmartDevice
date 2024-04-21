@@ -147,6 +147,7 @@ class DeviceActivity : ComponentActivity() {
             }
 
 
+
             override fun onCharacteristicRead(
                 gatt: BluetoothGatt,
                 characteristic: BluetoothGattCharacteristic,
