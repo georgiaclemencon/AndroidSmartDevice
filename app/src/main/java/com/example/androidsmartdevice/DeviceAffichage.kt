@@ -1,5 +1,6 @@
 package com.example.androidsmartdevice
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
 import androidx.compose.foundation.Image
@@ -25,11 +26,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import java.util.UUID
 
+
+@SuppressLint("UnrememberedMutableState")
 @Composable
 fun DeviceDetail(
     deviceInteraction: MutableState<DeviceComposableInteraction>,
     onConnectClick: () -> Unit
 ) {
+     var counter = mutableStateOf(0)
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -39,6 +43,9 @@ fun DeviceDetail(
         Button(onClick = onConnectClick) {
             Text("Se connecter")
         }
+
+        // Display the counter
+        Text("Compteur : ${counter.value}")
 
         DeviceActions(
             deviceInteraction
@@ -72,8 +79,6 @@ fun DeviceActions(
         )
     }
 }
-
-
 @Composable
 fun DisplaySubscriptionPrompt(
     deviceInteraction: MutableState<DeviceComposableInteraction>,
@@ -81,37 +86,75 @@ fun DisplaySubscriptionPrompt(
     onNotificationSubscribe: () -> Unit
 ) {
     // Create a state for the checkbox
-    val checkedState = remember { mutableStateOf(false) }
-    val ledControlState = remember { mutableStateOf(false) } // State for the new checkbox
+    val checkedState = remember { mutableStateOf(-1) } // -1 means no service is selected
+    val showAdditionalCheckboxesForService3 = remember { mutableStateOf(false) } // State to control the visibility of additional checkboxes for service 3
+
+    val valueToWrite: ByteArray = byteArrayOf()
 
     Column(modifier = Modifier.fillMaxSize()) { // Use fillMaxSize on the main container
         // Display the text
         Text("Abonnez-vous pour voir le nombre d'incrémentation")
 
-        // Display the checkbox
+        // Display the checkbox for service 3
         Checkbox(
-            checked = checkedState.value,
+            checked = checkedState.value == 2,
             onCheckedChange = {
-                checkedState.value = it
-                if (it) onNotificationSubscribe()
+                checkedState.value = if (it) 2 else -1
+                if (it) {
+                    onNotificationSubscribe()
+                    showAdditionalCheckboxesForService3.value = true // Show additional checkboxes when this checkbox is checked
+                } else {
+                    showAdditionalCheckboxesForService3.value = false // Hide additional checkboxes when this checkbox is unchecked
+                }
             }
         )
+
+        // Display the UUID of service 3 if its checkbox is checked
+        if (checkedState.value == 2) {
+            deviceInteraction.value.Services.getOrNull(2)?.let { service ->
+                Text("UUID du service 3: ${service.uuid}")
+            }
+        }
+
+        // Display additional checkboxes for service 3 when its checkbox is checked
+        if (showAdditionalCheckboxesForService3.value) {
+            Row {
+                Checkbox(
+                    checked = false,
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            val valueToWrite: ByteArray = byteArrayOf(0x01)
+                            // writeValueToCharacteristic(valueToWrite)
+                        }
+                    }
+                )
+                Text("Compteur : ${notificationCounter}")
+
+                Checkbox(
+                    checked = false,
+                    onCheckedChange = { /* Handle onCheckedChange */ }
+                )
+                Text("Copy compteur : ${notificationCounter}")
+            }
+        }
 
         // Display the new text
         Text("Abonnez-vous pour piloter les leds")
 
-        // Display the new checkbox
+        // Display the checkbox for service 2
         Checkbox(
-            checked = ledControlState.value,
-            onCheckedChange = { ledControlState.value = it }
+            checked = checkedState.value == 1,
+            onCheckedChange = {
+                checkedState.value = if (it) 1 else -1
+            }
         )
 
-        // Display the services and characteristics
-        DisplayServicesAndCharacteristics(
-            services = deviceInteraction.value.Services,
-            onSubscribeClick = { _, _ -> },
-            onWriteToService = { }
-        )
+        // Display the UUID of service 2 if its checkbox is checked
+        if (checkedState.value == 1) {
+            deviceInteraction.value.Services.getOrNull(1)?.let { service ->
+                Text("UUID du service 2: ${service.uuid}")
+            }
+        }
     }
 }
 
@@ -140,7 +183,6 @@ fun DisplayBulbLogo(
             })
     )
 }
-
 @Composable
 fun DisplayServicesAndCharacteristics(
     services: List<BluetoothGattService>,
@@ -162,10 +204,7 @@ fun DisplayServicesAndCharacteristics(
                                 service.characteristics.forEach { characteristic ->
                                     onSubscribeClick(service, characteristic)
                                 }
-                                // Check if the service is the service 2
-                                if (service.uuid == UUID.fromString("your-service-2-uuid")) {
-                                    onWriteToService(service)
-                                }
+                                onWriteToService(service)
                             }
                         }
                     )
@@ -180,6 +219,9 @@ fun DisplayServicesAndCharacteristics(
         }
     }
 }
+
+
+
 
 
 class DeviceComposableInteraction(
