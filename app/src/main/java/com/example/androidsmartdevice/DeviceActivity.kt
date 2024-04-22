@@ -38,11 +38,12 @@ class DeviceActivity : ComponentActivity() {
     private var counterBluetoothGattCharacteristic: BluetoothGattCharacteristic? = null
     private var controlBluetoothGattCharacteristic: BluetoothGattCharacteristic? = null
     private lateinit var deviceInteraction: DeviceComposableInteraction
-    private var counter = mutableStateOf(0)
 
     private var currentLEDStateEnum = LEDStateEnum.NONE
+    private val CCC_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805f9b34fb"
 
 
+    @SuppressLint("UnrememberedMutableState")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -68,6 +69,7 @@ class DeviceActivity : ComponentActivity() {
                     val ledState2 = remember { mutableStateOf(false) }
                     val ledState3 = remember { mutableStateOf(false) }
                     val ledStates = listOf(ledState1, ledState2, ledState3)
+                    val counter = remember { mutableStateOf(0) }
 
                     val ledArray = listOf(
                         Led(ledState1.value) { turnOnLight(0, LEDStateEnum.LED_1, ledStates) },
@@ -86,8 +88,12 @@ class DeviceActivity : ComponentActivity() {
                                 (notificationCounter.value.toInt() + 1).toString()
                         },
                         Services = mutableListOf(),
-                        readCharacteristic = {
-                            readCounterCharacteristic()
+                        counter = mutableStateOf("0"),
+                        subscribeToCounter = {
+                            subscribeToCounter()
+                        },
+                        unsubscribeToCounter = {
+                            unsubscribeToCounter()
                         }
                     )
 
@@ -237,6 +243,7 @@ class DeviceActivity : ComponentActivity() {
                         "BluetoothGattCallback",
                         "Characteristic $uuid changed | value: ${value.toHexString()}"
                     )
+                    deviceInteraction.counter.value = value.toHexString()
                 }
             }
 
@@ -251,6 +258,8 @@ class DeviceActivity : ComponentActivity() {
                         "BluetoothGattCallback",
                         "Characteristic $uuid changed | value: $newValueHex"
                     )
+
+                    deviceInteraction.counter.value = value.toHexString()
                 }
             }
 
@@ -281,6 +290,7 @@ class DeviceActivity : ComponentActivity() {
     @SuppressLint("MissingPermission")
     private fun connectionStateChange(gatt: BluetoothGatt?, newState: Int) {
         if (newState == BluetoothProfile.STATE_CONNECTED) {
+            readCounterCharacteristic()
             gatt?.discoverServices()
             runOnUiThread {
                 deviceInteraction.IsConnected = newState == BluetoothProfile.STATE_CONNECTED
@@ -288,9 +298,7 @@ class DeviceActivity : ComponentActivity() {
 
         }
     }
-
-
-    private fun turnOnLight(
+  private fun turnOnLight(
         index: Int,
         newLedState: LEDStateEnum,
         ledStates: List<MutableState<Boolean>>
@@ -383,67 +391,6 @@ class DeviceActivity : ComponentActivity() {
         }
     }
 
-//@SuppressLint("MissingPermission")
-//private fun writeValueToCharacteristic(value: ByteArray) {
-//
-//    Log.e("DeviceActivity", "writeValueToCharacteristic")
-//    // Check if the Bluetooth connection is established
-//    if (bluetoothGatt != null) {
-//        val service = bluetoothGatt?.services?.get(2)
-//
-//if (service != null && service.characteristics.isNotEmpty()) {
-//    val counterBluetoothGattCharacteristic = service.characteristics[0]
-//}
-//        if (counterBluetoothGattCharacteristic != null) {
-//            counterBluetoothGattCharacteristic!!.value = value
-//            bluetoothGatt?.writeCharacteristic(counterBluetoothGattCharacteristic)
-//
-//            Log.e("DeviceActivity", "writeValueToCharacteristic: $value")
-//        }
-//    }else{
-//        Log.e("DeviceActivity", "chateristique is null")
-//        }
-//
-//    }
-
-//    @SuppressLint("MissingPermission")
-//    private fun readCounterCharacteristic() {
-//        // Check if the Bluetooth connection is established
-//        if (bluetoothGatt != null) {
-//            val service = bluetoothGatt.services[2]
-//            val counterBluetoothGattCharacteristic = service.characteristics[1]
-//            if (counterBluetoothGattCharacteristic != null) {
-//                bluetoothGatt.readCharacteristic(counterBluetoothGattCharacteristic)
-//            }
-////            service?.forEach {
-////                Log.e("DeviceActivity", "Service: ${service.indexOf(it)}")
-////                var caracteristique = it.characteristics
-////                caracteristique.forEach {
-////                    Log.e("DeviceActivity", "Characteristic: ${caracteristique.indexOf(it)}")
-////                    bluetoothGatt.readCharacteristic(it)
-////                }
-////            }
-//
-////            if (service != null && service.characteristics.isNotEmpty()) {
-////                val counterBluetoothGattCharacteristic = service.characteristics
-////                Log.e("DeviceActivity", "readCounterCharacteristic: ${counterBluetoothGattCharacteristic.toString()}")
-////                counterBluetoothGattCharacteristic.forEach {
-////                    if (it.value != null) {
-////                        Log.e("DeviceActivity", "readCounterCharacteristic: ${it.uuid} | ${it.value?.toHexString()}")
-////                    }
-////
-////                }
-////                Log.e("DeviceActivity", "readCounterCharacteristic: ${counterBluetoothGattCharacteristic}")
-////                if (counterBluetoothGattCharacteristic != null) {
-////                    //bluetoothGatt.readCharacteristic(counterBluetoothGattCharacteristic)
-////                    val value = counterBluetoothGattCharacteristic.value
-////                    Log.e("DeviceActivity", "readCounterCharacteristic: ${value.toHexString()}")
-////                }
-////            } else {
-////                Log.e("DeviceActivity", "Characteristic is null")
-////            }
-//        }
-//    }
 
     @SuppressLint("MissingPermission")
     private fun readCounterCharacteristic() {
@@ -562,7 +509,7 @@ class DeviceActivity : ComponentActivity() {
 
     @SuppressLint("MissingPermission")
     fun enableNotifications(characteristic: BluetoothGattCharacteristic) {
-        val cccdUuid = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        val cccdUuid = UUID.fromString(CCC_DESCRIPTOR_UUID)
         val payload = when {
             characteristic.isIndicatable() -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
             characteristic.isNotifiable() -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -589,22 +536,44 @@ class DeviceActivity : ComponentActivity() {
             "${characteristic.uuid} doesn't contain the CCC descriptor!"
         )
     }
-//    @SuppressLint("MissingPermission")
-//    fun disableNotifications(characteristic: BluetoothGattCharacteristic) {
-//        if (!characteristic.isNotifiable() && !characteristic.isIndicatable()) {
-//            Log.e("ConnectionManager", "${characteristic.uuid} doesn't support indications/notifications")
-//            return
-//        }
-//
-//        val cccdUuid = UUID.fromString(CCC_DESCRIPTOR_UUID)
-//        characteristic.getDescriptor(cccdUuid)?.let { cccDescriptor ->
-//            if (bluetoothGatt?.setCharacteristicNotification(characteristic, false) == false) {
-//                Log.e("ConnectionManager", "setCharacteristicNotification failed for ${characteristic.uuid}")
-//                return
-//            }
-//            writeDescriptor(cccDescriptor, BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
-//        } ?: Log.e("ConnectionManager", "${characteristic.uuid} doesn't contain the CCC descriptor!")
-//    }
+
+    fun subscribeToCounter() {
+        val serviceUUID = UUID.fromString("0000feed-cc7a-482a-984a-7f2ed5b3e58f")
+        val service: BluetoothGattService? = bluetoothGatt.getService(serviceUUID)
+        val characteristic: BluetoothGattCharacteristic? =
+            service?.characteristics?.get(1) // Obtenez la première caractéristique
+
+        characteristic?.let {
+            enableNotifications(it)
+        }
+    }
+
+    fun unsubscribeToCounter() {
+        val serviceUUID = UUID.fromString("0000feed-cc7a-482a-984a-7f2ed5b3e58f")
+        val service: BluetoothGattService? = bluetoothGatt.getService(serviceUUID)
+        val characteristic: BluetoothGattCharacteristic? =
+            service?.characteristics?.get(1) // Obtenez la première caractéristique
+
+        characteristic?.let {
+            disableNotifications(it)
+        }
+    }
+    @SuppressLint("MissingPermission")
+    fun disableNotifications(characteristic: BluetoothGattCharacteristic) {
+        if (!characteristic.isNotifiable() && !characteristic.isIndicatable()) {
+            Log.e("ConnectionManager", "${characteristic.uuid} doesn't support indications/notifications")
+            return
+        }
+
+        val cccdUuid = UUID.fromString(CCC_DESCRIPTOR_UUID)
+        characteristic.getDescriptor(cccdUuid)?.let { cccDescriptor ->
+            if (bluetoothGatt?.setCharacteristicNotification(characteristic, false) == false) {
+                Log.e("ConnectionManager", "setCharacteristicNotification failed for ${characteristic.uuid}")
+                return
+            }
+            writeDescriptor(cccDescriptor, BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)
+        } ?: Log.e("ConnectionManager", "${characteristic.uuid} doesn't contain the CCC descriptor!")
+    }
 
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -33,7 +34,7 @@ fun DeviceDetail(
     deviceInteraction: MutableState<DeviceComposableInteraction>,
     onConnectClick: () -> Unit
 ) {
-     var counter = mutableStateOf(0)
+
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -43,12 +44,13 @@ fun DeviceDetail(
         Button(onClick = onConnectClick) {
             Text("Se connecter")
         }
-        Button(onClick = deviceInteraction.value.readCharacteristic) {
-            Text("Lire les caractéristiques")
-        }
+        LazyRow {
+            item {
 
-        // Display the counter
-        Text("Compteur : ${counter.value}")
+                // Display the counter
+                Text("Compteur : ${deviceInteraction.value.counter.value}")
+            }
+        }
 
         DeviceActions(
             deviceInteraction
@@ -105,8 +107,10 @@ fun DisplaySubscriptionPrompt(
                 checkedState.value = if (it) 2 else -1
                 if (it) {
                     onNotificationSubscribe()
+                    deviceInteraction.value.subscribeToCounter()
                     showAdditionalCheckboxesForService3.value = true // Show additional checkboxes when this checkbox is checked
                 } else {
+                    deviceInteraction.value.unsubscribeToCounter()
                     showAdditionalCheckboxesForService3.value = false // Hide additional checkboxes when this checkbox is unchecked
                 }
             }
@@ -235,7 +239,9 @@ class DeviceComposableInteraction(
     val onNotificationSubscribe: () -> Unit,
     val Services: MutableList<BluetoothGattService>,
     val serviceWithCharacteristics: MutableState<HashMap<UUID, List<UUID>> > = mutableStateOf(hashMapOf()),
-    val readCharacteristic: () -> Unit,
+    val counter: MutableState<String> = mutableStateOf("0"),
+    val subscribeToCounter: () -> Unit,
+    val unsubscribeToCounter: () -> Unit
 )
 
 
