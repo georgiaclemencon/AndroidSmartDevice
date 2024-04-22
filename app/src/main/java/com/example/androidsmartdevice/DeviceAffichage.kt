@@ -43,6 +43,9 @@ fun DeviceDetail(
         Button(onClick = onConnectClick) {
             Text("Se connecter")
         }
+        Button(onClick = deviceInteraction.value.readCharacteristic) {
+            Text("Lire les caractéristiques")
+        }
 
         // Display the counter
         Text("Compteur : ${counter.value}")
@@ -231,7 +234,8 @@ class DeviceComposableInteraction(
     var notificationCounter: String = "",
     val onNotificationSubscribe: () -> Unit,
     val Services: MutableList<BluetoothGattService>,
-    val serviceWithCharacteristics: MutableState<HashMap<UUID, List<UUID>> > = mutableStateOf(hashMapOf())
+    val serviceWithCharacteristics: MutableState<HashMap<UUID, List<UUID>> > = mutableStateOf(hashMapOf()),
+    val readCharacteristic: () -> Unit,
 )
 
 
