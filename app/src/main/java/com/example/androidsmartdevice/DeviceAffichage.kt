@@ -2,9 +2,15 @@ package com.example.androidsmartdevice
 
 import android.annotation.SuppressLint
 import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,8 +52,8 @@ fun DeviceDetail(
         DisplayRealTimeSpeed(deviceInteraction) // Affiche la vitesse en temps réel
         DisplayAverageSpeed(deviceActivity, deviceInteraction)
         //Stopwatch() // Affiche un chronomètre
-        TestChart()
-        MyComposable(deviceInteraction.value.realTimeSpeed) // Affiche un graphique
+        TestChart() // Assurez-vous que cette ligne est présente pour afficher le deuxième graphique
+        MyComposable(deviceInteraction.value) // Affiche un graphique
     }
 }
 
@@ -76,38 +82,83 @@ fun DisplayRealTimeSpeed(deviceInteraction: MutableState<DeviceComposableInterac
     Text("Vitesse en temps réel : ${speed.toInt()}")
 }
 
-
 fun createLineChart(accelerometerData: MutableState<List<Int>>): @Composable () -> Unit {
     return {
         val modelProducer = remember { CartesianChartModelProducer.build() }
-        LaunchedEffect(accelerometerData.value) {
+        val listSize = remember { mutableStateOf(accelerometerData.value.size) }
+
+        LaunchedEffect(listSize.value) {
             modelProducer.tryRunTransaction {
                 lineSeries {
                     series(accelerometerData.value)
                 }
             }
         }
-        CartesianChartHost(
-            rememberCartesianChart(
-                rememberLineCartesianLayer(),
-                startAxis = rememberStartAxis(),
-                bottomAxis = rememberBottomAxis(),
-            ),
-            modelProducer,
-        )
+
+        // Update listSize whenever accelerometerData changes
+        LaunchedEffect(accelerometerData.value) {
+            listSize.value = accelerometerData.value.size
+        }
+
+        Column {
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(),
+                    startAxis = rememberStartAxis(),
+                    bottomAxis = rememberBottomAxis(),
+                ),
+                modelProducer
+            )
+
+            // Your legend here
+           CustomLegend(
+    colors = listOf(androidx.compose.ui.graphics.Color.Red, androidx.compose.ui.graphics.Color(android.graphics.Color.GREEN), androidx.compose.ui.graphics.Color.Blue),
+    labels = listOf("Label 1", "Label 2", "Label 3")
+)
+
+        }
     }
 }
 
 
-// Modifier MyComposable pour prendre realTimeSpeed comme argument
-@SuppressLint("UnrememberedMutableState")
 @Composable
-fun MyComposable(realTimeSpeed: MutableState<Float>) {
-    Log.d("MyComposable", "Called with realTimeSpeed: ${realTimeSpeed.value}") // Log when MyComposable is called
-    val lineChart = createLineChart(mutableStateOf(listOf(realTimeSpeed.value.toInt())))
-    lineChart()
+fun CustomLegend(colors: List<androidx.compose.ui.graphics.Color>, labels: List<String>) {
+    Row {
+        colors.zip(labels).forEach { (color, label) ->
+            LegendItem(color = color, text = label)
+        }
+    }
 }
 
+
+
+@Composable
+fun LegendItem(color: androidx.compose.ui.graphics.Color, text: String) {
+    Row(Modifier.padding(horizontal = 8.dp)) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .background(color = color)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = text)
+    }
+}
+
+
+@SuppressLint("UnrememberedMutableState")
+@Composable
+fun MyComposable(deviceInteraction: DeviceComposableInteraction) {
+    Log.d("MyComposable", "Called with realTimeSpeed: ${deviceInteraction.realTimeSpeed}") // Log when MyComposable is called
+    val speedValues = if (deviceInteraction.speedValues.value.isEmpty()) {
+        mutableStateOf(listOf(0)) // Use a list with a single zero if speedValues is empty
+    } else {
+        deviceInteraction.speedValues // Use speedValues if it's not empty
+    }
+    val lineChart = createLineChart(speedValues) // Use speedValues for the chart data
+
+    lineChart()
+}
 
 // Create a test chart with static data
 @SuppressLint("UnrememberedMutableState")
@@ -141,6 +192,6 @@ fun Stopwatch() {
 class DeviceComposableInteraction(
     var IsConnected: Boolean = false,
     var deviceTitle: String = "",
-    var realTimeSpeed: MutableState<Float> = mutableStateOf(0f), // Change val to var
-    val speedValues: MutableList<Float> = mutableListOf() // List to store all speed values
+    var realTimeSpeed: MutableState<Float> = mutableStateOf(0f),
+    var speedValues: MutableState<List<Int>> = mutableStateOf(listOf()) // List to store all speed values as Int
 )

@@ -58,25 +58,26 @@ class DeviceActivity : ComponentActivity() {
                 connectionStateChange(gatt, newState)
             }
 
-            override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-                super.onServicesDiscovered(gatt, status)
-//                logServices(gatt)
+           override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+    super.onServicesDiscovered(gatt, status)
 
-                val serviceUUID = UUID.fromString("00000000-cc7a-482a-984a-7f2ed5b3e58f")
-                val characteristicUUID = UUID.fromString("0000abcd-8e22-4541-9d4c-21edae82ed19")
-                val cccDescriptorUUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+    val serviceUUID = UUID.fromString("00000000-cc7a-482a-984a-7f2ed5b3e58f")
+    val characteristicUUID = UUID.fromString("0000abcd-8e22-4541-9d4c-21edae82ed19")
+    val cccDescriptorUUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
-                val service = gatt?.getService(serviceUUID)
-                val characteristic = service?.getCharacteristic(characteristicUUID)
+    val service = gatt?.getService(serviceUUID)
+    val characteristic = service?.getCharacteristic(characteristicUUID)
 
-                if (characteristic != null) {
-                    gatt.setCharacteristicNotification(characteristic, true)
+    if (characteristic != null) {
+        realSpeedBluetoothGattCharacteristic = characteristic // Assign the characteristic to realSpeedBluetoothGattCharacteristic
 
-                    val descriptor = characteristic.getDescriptor(cccDescriptorUUID)
-                    descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                    gatt.writeDescriptor(descriptor)
-                }
-            }
+        gatt.setCharacteristicNotification(characteristic, true)
+
+        val descriptor = characteristic.getDescriptor(cccDescriptorUUID)
+        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        gatt.writeDescriptor(descriptor)
+    }
+}
 
             override fun onCharacteristicRead(
                 gatt: BluetoothGatt?,
@@ -102,7 +103,8 @@ class DeviceActivity : ComponentActivity() {
 
     if (characteristic.uuid == realSpeedBluetoothGattCharacteristic?.uuid) {
         val newSpeed = intValue.toFloat()
-        deviceInteraction.realTimeSpeed = mutableStateOf(newSpeed) // Force recomposition
+        deviceInteraction.realTimeSpeed.value = newSpeed // Update the value
+        deviceInteraction.speedValues.value = deviceInteraction.speedValues.value + newSpeed.toInt() // Add the new speed to speedValues
         Log.e("RealTimeSpeed", "Real Time Speed: $newSpeed") // Log the real time speed
     } else {
         Log.e("RealTimeSpeed", "UUID does not match: ${characteristic.uuid}")
@@ -137,15 +139,15 @@ class DeviceActivity : ComponentActivity() {
 
 
     fun calculateAverageSpeed(): Float {
-        return if (deviceInteraction.speedValues.isNotEmpty()) { // Check if speedValues is not empty
-            val averageSpeed = deviceInteraction.speedValues.average()
-            Log.d("AverageSpeed", "Average Speed: $averageSpeed")
-            averageSpeed.toFloat()
-        } else {
-            Log.d("AverageSpeed", "No speed values available")
-            0f
-        }
+    return if (deviceInteraction.speedValues.value.isNotEmpty()) { // Check if speedValues is not empty
+        val averageSpeed = deviceInteraction.speedValues.value.average()
+        Log.d("AverageSpeed", "Average Speed: $averageSpeed")
+        averageSpeed.toFloat()
+    } else {
+        Log.d("AverageSpeed", "No speed values available")
+        0f
     }
+}
 
     override fun onStop() {
         super.onStop()
