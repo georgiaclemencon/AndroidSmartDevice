@@ -1,40 +1,39 @@
 package com.example.androidsmartdevice
 
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothGattCharacteristic
-import android.bluetooth.BluetoothGattService
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import android.util.Log
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import java.util.UUID
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottomAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStartAxis
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.core.cartesian.data.lineSeries
+import kotlinx.coroutines.delay
 
 
 @SuppressLint("UnrememberedMutableState")
 @Composable
 fun DeviceDetail(
+    deviceActivity: DeviceActivity,
     deviceInteraction: MutableState<DeviceComposableInteraction>,
     onConnectClick: () -> Unit
 ) {
-
     Column(
         modifier = Modifier
             .padding(16.dp)
@@ -44,205 +43,104 @@ fun DeviceDetail(
         Button(onClick = onConnectClick) {
             Text("Se connecter")
         }
-        LazyRow {
-            item {
-
-                // Display the counter
-                Text("Compteur : ${deviceInteraction.value.counter.value}")
-            }
-        }
-
-        DeviceActions(
-            deviceInteraction
-        ) { index -> deviceInteraction.value.LedArray[index].switchLed(index) }
+        DisplayRealTimeSpeed(deviceInteraction) // Affiche la vitesse en temps réel
+        DisplayAverageSpeed(deviceActivity, deviceInteraction)
+        //Stopwatch() // Affiche un chronomètre
+        TestChart()
+        MyComposable(deviceInteraction.value.realTimeSpeed) // Affiche un graphique
     }
 }
 
 @Composable
-fun DeviceActions(
-    deviceInteraction: MutableState<DeviceComposableInteraction>,
-    onLedToggle: (Int) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .fillMaxWidth()
-    ) {
-        Row { // Utiliser Row pour afficher les ampoules en ligne
-            deviceInteraction.value.LedArray.forEachIndexed { index, led ->
-                DisplayBulbLogo(
-                    onClick = { led.switchLed(index) },
-                    onNotificationSubscribe = deviceInteraction.value.onNotificationSubscribe,
-                    isOn = mutableStateOf(led.isOn)
-                )
-            }
-        }
-        DisplaySubscriptionPrompt(
-            deviceInteraction = deviceInteraction,
-            notificationCounter = deviceInteraction.value.notificationCounter,
-            onNotificationSubscribe = deviceInteraction.value.onNotificationSubscribe
-        )
-    }
-}
-@Composable
-fun DisplaySubscriptionPrompt(
-    deviceInteraction: MutableState<DeviceComposableInteraction>,
-    notificationCounter: String,
-    onNotificationSubscribe: () -> Unit
-) {
-    // Create a state for the checkbox
-    val checkedState = remember { mutableStateOf(-1) } // -1 means no service is selected
-    val showAdditionalCheckboxesForService3 = remember { mutableStateOf(false) } // State to control the visibility of additional checkboxes for service 3
+fun DisplayAverageSpeed(deviceActivity: DeviceActivity, deviceInteraction: MutableState<DeviceComposableInteraction>) {
+    var averageSpeed by remember { mutableStateOf(0f) }
 
-    val valueToWrite: ByteArray = byteArrayOf()
 
-    Column(modifier = Modifier.fillMaxSize()) { // Use fillMaxSize on the main container
-        // Display the text
-        Text("Abonnez-vous pour voir le nombre d'incrémentation")
-
-        // Display the checkbox for service 3
-        Checkbox(
-            checked = checkedState.value == 2,
-            onCheckedChange = {
-                checkedState.value = if (it) 2 else -1
-                if (it) {
-                    onNotificationSubscribe()
-                    deviceInteraction.value.subscribeToCounter()
-                    showAdditionalCheckboxesForService3.value = true // Show additional checkboxes when this checkbox is checked
-                } else {
-                    deviceInteraction.value.unsubscribeToCounter()
-                    showAdditionalCheckboxesForService3.value = false // Hide additional checkboxes when this checkbox is unchecked
-                }
-            }
-        )
-
-        // Display the UUID of service 3 if its checkbox is checked
-        if (checkedState.value == 2) {
-            deviceInteraction.value.Services.getOrNull(2)?.let { service ->
-                Text("UUID du service 3: ${service.uuid}")
-            }
-        }
-
-        // Display additional checkboxes for service 3 when its checkbox is checked
-        if (showAdditionalCheckboxesForService3.value) {
-            Row {
-                Checkbox(
-                    checked = false,
-                    onCheckedChange = { checked ->
-                        if (checked) {
-                            val valueToWrite: ByteArray = byteArrayOf(0x01)
-                            // writeValueToCharacteristic(valueToWrite)
-                        }
-                    }
-                )
-                Text("Compteur : ${notificationCounter}")
-
-                Checkbox(
-                    checked = false,
-                    onCheckedChange = { /* Handle onCheckedChange */ }
-                )
-                Text("Copy compteur : ${notificationCounter}")
-            }
-        }
-
-        // Display the new text
-        Text("Abonnez-vous pour piloter les leds")
-
-        // Display the checkbox for service 2
-        Checkbox(
-            checked = checkedState.value == 1,
-            onCheckedChange = {
-                checkedState.value = if (it) 1 else -1
-            }
-        )
-
-        // Display the UUID of service 2 if its checkbox is checked
-        if (checkedState.value == 1) {
-            deviceInteraction.value.Services.getOrNull(1)?.let { service ->
-                Text("UUID du service 2: ${service.uuid}")
-            }
+    LaunchedEffect(key1 = true) {
+        while (true) {
+            averageSpeed = deviceActivity.calculateAverageSpeed()
+            delay(5000L) // delay for 5 seconds
         }
     }
+
+    Text("Vitesse moyenne : ${averageSpeed.toInt()}")
+    Log.e("Average Speed", "Average Speed: $averageSpeed")
+}
+
+@Composable
+fun DisplayRealTimeSpeed(deviceInteraction: MutableState<DeviceComposableInteraction>) {
+    val speed = deviceInteraction.value.realTimeSpeed.value
+    LaunchedEffect(speed) {
+        // This block will be recomposed whenever speed changes
+    }
+    Text("Vitesse en temps réel : ${speed.toInt()}")
 }
 
 
-
-
-
-@Composable
-fun DisplayBulbLogo(
-    onClick: () -> Unit,
-    onNotificationSubscribe: () -> Unit,
-    isOn: MutableState<Boolean>
-) {
-    val imageResource =
-        if (isOn.value) R.drawable.baseline_lightbulb_24 else R.drawable.ampoule_vide
-
-    Image(
-        painter = painterResource(id = imageResource),
-        contentDescription = "Logo Ampoule",
-        modifier = Modifier
-            .size(100.dp)
-            .clickable(onClick = {
-                isOn.value = !isOn.value
-                onClick()
-                onNotificationSubscribe()
-            })
-    )
-}
-@Composable
-fun DisplayServicesAndCharacteristics(
-    services: List<BluetoothGattService>,
-    onSubscribeClick: (BluetoothGattService, BluetoothGattCharacteristic) -> Unit,
-    onWriteToService: (BluetoothGattService) -> Unit
-) {
-    if (services.isEmpty()) {
-        Text("Aucun service disponible", color = Color.Red)
-    } else {
-        LazyColumn {
-            items(services) { service ->
-                val checkedState = remember { mutableStateOf(false) }
-                Row {
-                    Checkbox(
-                        checked = checkedState.value,
-                        onCheckedChange = { checked ->
-                            checkedState.value = checked
-                            if (checked) {
-                                service.characteristics.forEach { characteristic ->
-                                    onSubscribeClick(service, characteristic)
-                                }
-                                onWriteToService(service)
-                            }
-                        }
-                    )
-                    Text("Service UUID: ${service.uuid}", color = Color.Red)
-                }
-                service.characteristics.forEach { characteristic ->
-                    Row {
-                        Text("Characteristic UUID: ${characteristic.uuid}", color = Color.DarkGray)
-                    }
+fun createLineChart(accelerometerData: MutableState<List<Int>>): @Composable () -> Unit {
+    return {
+        val modelProducer = remember { CartesianChartModelProducer.build() }
+        LaunchedEffect(accelerometerData.value) {
+            modelProducer.tryRunTransaction {
+                lineSeries {
+                    series(accelerometerData.value)
                 }
             }
         }
+        CartesianChartHost(
+            rememberCartesianChart(
+                rememberLineCartesianLayer(),
+                startAxis = rememberStartAxis(),
+                bottomAxis = rememberBottomAxis(),
+            ),
+            modelProducer,
+        )
     }
 }
 
 
+// Modifier MyComposable pour prendre realTimeSpeed comme argument
+@SuppressLint("UnrememberedMutableState")
+@Composable
+fun MyComposable(realTimeSpeed: MutableState<Float>) {
+    Log.d("MyComposable", "Called with realTimeSpeed: ${realTimeSpeed.value}") // Log when MyComposable is called
+    val lineChart = createLineChart(mutableStateOf(listOf(realTimeSpeed.value.toInt())))
+    lineChart()
+}
 
 
+// Create a test chart with static data
+@SuppressLint("UnrememberedMutableState")
+@Composable
+fun TestChart() {
+    val testData = mutableStateOf(listOf(1, 2, 3, 4, 5))
+    val lineChart = createLineChart(testData)
+    lineChart()
+}
 
+
+@Composable
+fun Stopwatch() {
+    var time by remember { mutableStateOf(0) }
+    var isRunning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRunning) {
+        while (isRunning) {
+            delay(1000L)
+            time++
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = "Time: $time", modifier = Modifier.padding(16.dp))
+        Button(onClick = { isRunning = !isRunning }) {
+            Text(if (isRunning) "Stop" else "Start")
+        }
+    }
+}
 class DeviceComposableInteraction(
     var IsConnected: Boolean = false,
     var deviceTitle: String = "",
-    val LedArray: List<Led>,
-    var notificationCounter: String = "",
-    val onNotificationSubscribe: () -> Unit,
-    val Services: MutableList<BluetoothGattService>,
-    val serviceWithCharacteristics: MutableState<HashMap<UUID, List<UUID>> > = mutableStateOf(hashMapOf()),
-    val counter: MutableState<String> = mutableStateOf("0"),
-    val subscribeToCounter: () -> Unit,
-    val unsubscribeToCounter: () -> Unit
+    var realTimeSpeed: MutableState<Float> = mutableStateOf(0f), // Change val to var
+    val speedValues: MutableList<Float> = mutableListOf() // List to store all speed values
 )
-
-
-data class Led(var isOn: Boolean, val switchLed: (index: Int) -> Unit)
